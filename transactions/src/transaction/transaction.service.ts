@@ -35,8 +35,8 @@ export class TransactionService {
 
   public getTransactions(clientId?: number) {
     return clientId
-      ? global.allTransactions.filter((x) => x.client_id === clientId)
-      : global.allTransactions;
+      ? global.transactionCommissions.filter((x) => x.client_id === clientId)
+      : global.transactionCommissions;
   }
 
   private mapToTransaction(newTransaction: CreateTransactionDto): Transaction {
