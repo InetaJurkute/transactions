@@ -3,50 +3,42 @@ import Big from 'big.js';
 
 import { ExchangeRateClientService } from 'src/exchange-rate-client/exchange-rate-client.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { Transaction } from './dto/transaction.dto';
 
 @Injectable()
 export class TransactionService {
   constructor(
     private readonly exchangeRateClientService: ExchangeRateClientService,
   ) {
-    global.clientTransactions = [];
+    global.allTransactions = [];
+    global.transactionFees = [];
   }
 
-  async getCommission(transactionInfo: CreateTransactionDto) {
-    global.clientTransactions.push(transactionInfo);
+  async addTransaction(newTransaction: CreateTransactionDto) {
+    const transaction = this.mapToTransaction(newTransaction);
+
+    global.allTransactions.push(transaction);
 
     const exchangeRates =
       await this.exchangeRateClientService.getExchangeRates();
 
-    const commissions = this.getClientsCommissions(
-      transactionInfo,
-      exchangeRates,
-    );
+    const fee = this.calculateClientCommissions(transaction, exchangeRates);
 
-    return commissions;
+    global.transactionFees.push(fee);
+    return global.transactionFees;
   }
 
-  findAll() {
-    return `This action returns all transaction`;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} transaction`;
-  }
-
-  update(id: number) {
-    return `This action updates a #${id} transaction`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} transaction`;
+  getTransactions(clientId?: number) {
+    return clientId
+      ? global.allTransactions.filter((x) => x.client_id === clientId)
+      : global.allTransactions;
   }
 
   getSingleTransactionCommission(
-    transactionInfo: CreateTransactionDto,
+    transactionInfo: Transaction,
     exchangeRates: Map<string, number>,
   ) {
-    const amountDecimal = new Big(parseFloat(transactionInfo.amount));
+    const amountDecimal = new Big(transactionInfo.amount);
     const minimumTransactionAmount = 0.05; // EUR
 
     const eurAmount = amountDecimal.times(
@@ -55,66 +47,62 @@ export class TransactionService {
     const amountByPercentage = eurAmount.times(0.005);
 
     const amount = amountByPercentage.gt(new Big(minimumTransactionAmount))
-      ? amountByPercentage
+      ? amountByPercentage.toNumber()
       : minimumTransactionAmount;
 
-    return parseFloat(amount.toString()); // big js convert to number
+    return amount;
   }
 
-  getClientsCommissions(
-    transactionInfo: CreateTransactionDto,
+  calculateClientCommissions(
+    transaction: Transaction,
     exchangeRates: Map<string, number>,
   ) {
-    const gTrans = global.clientTransactions;
+    const allTransactions: Transaction[] = global.allTransactions;
 
-    const transSumByClient: { clientId: number; transactionSum: number }[] = [];
+    console.log('all ', allTransactions);
+    console.log('new ', transaction);
 
-    const commissions = gTrans.map((transaction) => {
-      let currentClientData = transSumByClient.find(
-        (x) => x.clientId === transaction.client_id,
+    const clientTransactions = allTransactions.filter(
+      (x) => x.client_id === transaction.client_id,
+    );
+    const clientTransactionSum = clientTransactions
+      .map((x) => x.amount)
+      .reduce((prev, curr) => prev + curr, 0); // DO BY MONTH
+
+    if (clientTransactionSum >= 1000) {
+      return {
+        ...transaction,
+        commission_amount: 0.03,
+        commission_currency: 'EUR',
+      };
+    } else {
+      if (transaction.client_id === 42) {
+        return {
+          ...transaction,
+          commission_amount: 0.05,
+          commission_currency: 'EUR',
+        };
+      }
+
+      const commission = this.getSingleTransactionCommission(
+        transaction,
+        exchangeRates,
       );
 
-      if (currentClientData) {
-        currentClientData.transactionSum =
-          currentClientData.transactionSum + parseFloat(transaction.amount);
-      } else {
-        const newClientData = {
-          clientId: transaction.client_id,
-          transactionSum: parseFloat(transaction.amount),
-        };
+      return {
+        ...transaction,
+        commission_amount: commission,
+        commission_currency: 'EUR',
+      };
+    }
+  }
 
-        transSumByClient.push(newClientData);
-        currentClientData = newClientData;
-      }
-
-      if (currentClientData.transactionSum > 1000) {
-        return {
-          amount: 0.03,
-          currency: 'EUR',
-          client_id: transaction.client_id,
-        };
-      } else {
-        if (transaction.client_id === 42) {
-          return {
-            amount: 0.05,
-            currency: 'EUR',
-            client_id: transaction.client_id,
-          };
-        }
-
-        const commission = this.getSingleTransactionCommission(
-          transactionInfo,
-          exchangeRates,
-        );
-
-        return {
-          amount: commission,
-          currency: 'EUR',
-          client_id: transaction.client_id,
-        };
-      }
-    });
-
-    return commissions;
+  mapToTransaction(newTransaction: CreateTransactionDto): Transaction {
+    return {
+      date: newTransaction.date,
+      amount: parseFloat(newTransaction.amount),
+      currency: newTransaction.currency,
+      client_id: newTransaction.client_id,
+    };
   }
 }
