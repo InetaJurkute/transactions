@@ -18,17 +18,12 @@ export class TransactionService {
     const exchangeRates =
       await this.exchangeRateClientService.getExchangeRates();
 
-    // do EUR
-
-    // 100 EUR - 5 eurai
-    // 100 USD - 5 USD * 1.21 = 6.05 EUR, kai pirma procentas, tada convertionas
-    // 100 USD * 1.21 = 6.05 kai pirma convertionas tada procentas
-    const commissionAmount = this.getCommissionAmount(
+    const commissions = this.getClientsCommissions(
       transactionInfo,
       exchangeRates,
     );
 
-    return commissionAmount;
+    return commissions;
   }
 
   findAll() {
@@ -47,24 +42,11 @@ export class TransactionService {
     return `This action removes a #${id} transaction`;
   }
 
-  getCommissionAmount(
-    transactionInfo: CreateTransactionDto,
-    exchangeRates: Map<string, number>,
-  ) {
-    const commissions = this.getClientsCommissions(
-      transactionInfo,
-      exchangeRates,
-    );
-
-    return commissions;
-  }
-
   getSingleTransactionCommission(
     transactionInfo: CreateTransactionDto,
     exchangeRates: Map<string, number>,
   ) {
     const amountDecimal = new Big(parseFloat(transactionInfo.amount));
-    // rule 1
     const minimumTransactionAmount = 0.05; // EUR
 
     const eurAmount = amountDecimal.times(
@@ -85,13 +67,27 @@ export class TransactionService {
   ) {
     const gTrans = global.clientTransactions;
 
-    let transSum = 0;
+    const transSumByClient: { clientId: number; transactionSum: number }[] = [];
 
     const commissions = gTrans.map((transaction) => {
-      transSum = transSum + parseFloat(transaction.amount);
-      console.log('trans sum', transSum);
+      let currentClientData = transSumByClient.find(
+        (x) => x.clientId === transaction.client_id,
+      );
 
-      if (transSum > 1000) {
+      if (currentClientData) {
+        currentClientData.transactionSum =
+          currentClientData.transactionSum + parseFloat(transaction.amount);
+      } else {
+        const newClientData = {
+          clientId: transaction.client_id,
+          transactionSum: parseFloat(transaction.amount),
+        };
+
+        transSumByClient.push(newClientData);
+        currentClientData = newClientData;
+      }
+
+      if (currentClientData.transactionSum > 1000) {
         return {
           amount: 0.03,
           currency: 'EUR',
