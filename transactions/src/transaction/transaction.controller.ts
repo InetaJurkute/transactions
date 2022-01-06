@@ -13,7 +13,6 @@ export class TransactionController {
 
   @Get()
   getTransactions(@Query('clientId') clientId: string) {
-    console.log('all', typeof clientId);
     return this.transactionService.getTransactions(parseInt(clientId));
   }
 }
