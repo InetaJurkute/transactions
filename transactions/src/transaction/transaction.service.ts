@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { CommissionCalculationService } from 'src/commission-calculation/commission-calculation.service';
-import { ExchangeRateClientService } from 'src/exchange-rate-client/exchange-rate-client.service';
+import { CommissionCalculationService } from '../commission-calculation/commission-calculation.service';
+import { ExchangeRateClientService } from '../exchange-rate-client/exchange-rate-client.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { Transaction } from './dto/transaction.dto';
 
